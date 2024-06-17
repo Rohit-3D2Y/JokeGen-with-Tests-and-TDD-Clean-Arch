@@ -1,52 +1,67 @@
-// ignore_for_file: prefer_const_constructors
-
-import 'dart:async';
-
 import 'package:dartz/dartz.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:joke_gen_1/features/jokes/domain/entities/jokes.dart';
-import 'package:joke_gen_1/features/jokes/domain/repos_2/joke_repository.dart';
+import 'package:joke_gen_1/features/jokes/domain/usecases/get_random_joke.dart';
+import 'package:joke_gen_1/features/jokes/presentation/bloc/joke_bloc.dart';
+import 'package:joke_gen_1/features/jokes/presentation/bloc/joke_state.dart';
 import 'package:joke_gen_1/features/jokes/presentation/pages/joke_page.dart';
+import 'package:mockito/annotations.dart';
 import 'package:mockito/mockito.dart';
 
-// Mock JokeRepository
-class MockJokeRepository extends Mock implements JokeRepository {}
+import 'widget_test.mocks.dart';
 
+@GenerateMocks([JokeBloc, GetJoke])
 void main() {
-  late MockJokeRepository mockJokeRepository;
+  late MockJokeBloc mockJokeBloc;
+  late MockGetJoke mockGetRandomJoke;
 
   setUp(() {
-    mockJokeRepository = MockJokeRepository();
+    mockJokeBloc = MockJokeBloc();
+    mockGetRandomJoke = MockGetJoke();
   });
 
-  testWidgets('JokePage - Widget Test', (WidgetTester tester) async {
-    // Mock data
-    final mockJoke = Joke(setup: 'Why did the scarecrow win an award?', punchline: 'Because he was outstanding in his field!');
+  Widget makeTestableWidget(Widget child) {
+    return MaterialApp(
+      home: BlocProvider<JokeBloc>(
+        create: (context) => mockJokeBloc,
+        child: child,
+      ),
+    );
+  }
 
-    // Build JokePage with mocked dependencies
-    await tester.pumpWidget(MaterialApp(
-      home: JokePage(jokeRepository: mockJokeRepository),
-    ));
+  testWidgets('JokePage displays a joke when loaded', (WidgetTester tester) async {
+    final joke = Joke(setup: 'Why did the scarecrow win an award?', punchline: 'Because he was outstanding in his field!');
+
+    // Stub the behavior of GetRandomJoke use case
+    when(mockGetRandomJoke(any)).thenAnswer((_) async => Right(joke));
+
+    // Stub the stream property of mockJokeBloc to return a stream of states
+    when(mockJokeBloc.stream).thenAnswer((_) => Stream.fromIterable([
+      JokeEmpty(),
+      JokeLoading(),
+      JokeLoaded(joke: joke),
+    ]));
+
+    // Pump the widget wrapped with MaterialApp and BlocProvider
+    await tester.pumpWidget(makeTestableWidget(JokePage()));
 
     // Verify initial state
     expect(find.text('Press the button to get a joke'), findsOneWidget);
 
-    // Mock behavior when `getRandomJoke` is called
-    when(mockJokeRepository.getRandomJoke()).thenAnswer((_) async => Right(mockJoke));
-
-    // Tap on the floating action button
+    // Tap the button to trigger event
     await tester.tap(find.byType(FloatingActionButton));
     await tester.pump();
 
-    // Verify loading indicator appears
+    // Verify loading state
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
 
-    // Wait for the state to update
-    await tester.pump(Duration(seconds: 1));
+    // Wait for the widget to rebuild with loaded state
+    await tester.pump();
 
-    // Verify joke setup and punchline are displayed
-    expect(find.text(mockJoke.setup), findsOneWidget);
-    expect(find.text(mockJoke.punchline), findsOneWidget);
+    // Verify loaded joke is displayed
+    expect(find.text(joke.setup), findsOneWidget);
+    expect(find.text(joke.punchline), findsOneWidget);
   });
 }
