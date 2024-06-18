@@ -1,67 +1,187 @@
-import 'package:dartz/dartz.dart';
+// ignore_for_file: unused_local_variable
+
+import 'dart:async';
+
+import 'package:bloc_test/bloc_test.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:get_it/get_it.dart';
 import 'package:joke_gen_1/features/jokes/domain/entities/jokes.dart';
+import 'package:joke_gen_1/features/jokes/domain/repos_2/joke_repository.dart';
 import 'package:joke_gen_1/features/jokes/domain/usecases/get_random_joke.dart';
+import 'package:joke_gen_1/features/jokes/presentation/bloc/joke_event.dart';
+import 'package:mockito/annotations.dart';
 import 'package:joke_gen_1/features/jokes/presentation/bloc/joke_bloc.dart';
 import 'package:joke_gen_1/features/jokes/presentation/bloc/joke_state.dart';
 import 'package:joke_gen_1/features/jokes/presentation/pages/joke_page.dart';
-import 'package:mockito/annotations.dart';
-import 'package:mockito/mockito.dart';
 
-import 'widget_test.mocks.dart';
+import 'presentation/bloc_test.mocks.dart';
 
-@GenerateMocks([JokeBloc, GetJoke])
+class MockJokeBloc extends MockBloc<JokeEvent, JokeState> implements JokeBloc {}
+
+@GenerateMocks([JokeRepository, GetJoke])
 void main() {
+  late MockGetJoke mockGetJoke;
+  late MockJokeRepository mockJokeRepository;
   late MockJokeBloc mockJokeBloc;
-  late MockGetJoke mockGetRandomJoke;
 
   setUp(() {
+    GetIt.I.reset();
+    mockGetJoke = MockGetJoke();
+    mockJokeRepository = MockJokeRepository();
     mockJokeBloc = MockJokeBloc();
-    mockGetRandomJoke = MockGetJoke();
+    GetIt.I.registerSingleton<JokeRepository>(
+      mockJokeRepository,
+    );
   });
 
-  Widget makeTestableWidget(Widget child) {
-    return MaterialApp(
-      home: BlocProvider<JokeBloc>(
-        create: (context) => mockJokeBloc,
-        child: child,
+  testWidgets('JokePage renders correctly in initial state',
+      (WidgetTester tester) async {
+    // Mock the initial state of the JokeBloc
+    // when(mockJokeBloc.state).thenReturn(JokeEmpty());
+    final StreamController<JokeState> controller =
+        StreamController<JokeState>.broadcast();
+
+    whenListen(
+      mockJokeBloc,
+      controller.stream,
+      initialState: JokeEmpty(),
+    );
+
+    await tester.pumpWidget(
+      MultiBlocProvider(
+        providers: [
+          BlocProvider<JokeBloc>(
+            create: (context) => mockJokeBloc,
+          ),
+        ],
+        child: MaterialApp(
+          home: JokePage(),
+        ),
       ),
     );
-  }
+    await tester.pump();
 
-  testWidgets('JokePage displays a joke when loaded', (WidgetTester tester) async {
-    final joke = Joke(setup: 'Why did the scarecrow win an award?', punchline: 'Because he was outstanding in his field!');
-
-    // Stub the behavior of GetRandomJoke use case
-    when(mockGetRandomJoke(any)).thenAnswer((_) async => Right(joke));
-
-    // Stub the stream property of mockJokeBloc to return a stream of states
-    when(mockJokeBloc.stream).thenAnswer((_) => Stream.fromIterable([
-      JokeEmpty(),
-      JokeLoading(),
-      JokeLoaded(joke: joke),
-    ]));
-
-    // Pump the widget wrapped with MaterialApp and BlocProvider
-    await tester.pumpWidget(makeTestableWidget(JokePage()));
-
-    // Verify initial state
+    // Check if the initial text is displayed
     expect(find.text('Press the button to get a joke'), findsOneWidget);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text('An error occurred'), findsNothing);
+    expect(find.text('setup'), findsNothing);
+    expect(find.text('punchline'), findsNothing);
+    controller.close();
 
-    // Tap the button to trigger event
-    await tester.tap(find.byType(FloatingActionButton));
+    // controller.add(JokeLoading());
+    // await tester.pump();
+    //     expect(find.byType(CircularProgressIndicator), findsOneWidget);
+  });
+  testWidgets('JokePage renders correctly in Loading state',
+      (WidgetTester tester) async {
+    // Mock the initial state of the JokeBloc
+    // when(mockJokeBloc.state).thenReturn(JokeEmpty());
+    final StreamController<JokeState> controller =
+        StreamController<JokeState>.broadcast();
+
+    whenListen(
+      mockJokeBloc,
+      controller.stream,
+      initialState: JokeLoading(),
+    );
+
+    await tester.pumpWidget(
+      MultiBlocProvider(
+        providers: [
+          BlocProvider<JokeBloc>(
+            create: (context) => mockJokeBloc,
+          ),
+        ],
+        child: MaterialApp(
+          home: JokePage(),
+        ),
+      ),
+    );
     await tester.pump();
 
-    // Verify loading state
+    // Check if the initial text is displayed
+    expect(find.text('Press the button to get a joke'), findsNothing);
     expect(find.byType(CircularProgressIndicator), findsOneWidget);
+    expect(find.text('An error occurred'), findsNothing);
+    expect(find.text('setup'), findsNothing);
+    expect(find.text('punchline'), findsNothing);
+  });
 
-    // Wait for the widget to rebuild with loaded state
+  testWidgets('JokePage renders correctly in Loaded state',
+      (WidgetTester tester) async {
+    // Mock the initial state of the JokeBloc
+    // when(mockJokeBloc.state).thenReturn(JokeEmpty());
+    final StreamController<JokeState> controller =
+        StreamController<JokeState>.broadcast();
+
+    final Joke joke = Joke(setup: 'setup', punchline: 'punchline');
+
+    whenListen(
+      mockJokeBloc,
+      controller.stream,
+      initialState:
+          JokeLoaded(joke: Joke(setup: 'setup', punchline: 'punchline')),
+    );
+
+    await tester.pumpWidget(
+      MultiBlocProvider(
+        providers: [
+          BlocProvider<JokeBloc>(
+            create: (context) => mockJokeBloc,
+          ),
+        ],
+        child: MaterialApp(
+          home: JokePage(),
+        ),
+      ),
+    );
     await tester.pump();
 
-    // Verify loaded joke is displayed
-    expect(find.text(joke.setup), findsOneWidget);
-    expect(find.text(joke.punchline), findsOneWidget);
+    // Check if the initial text is displayed
+    expect(find.text('Press the button to get a joke'), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text('An error occurred'), findsNothing);
+    expect(find.text('setup'), findsOneWidget);
+    expect(find.text('punchline'), findsOneWidget);
+  });
+
+  testWidgets('JokePage renders correctly in Error state',
+      (WidgetTester tester) async {
+    // Mock the initial state of the JokeBloc
+    // when(mockJokeBloc.state).thenReturn(JokeEmpty());
+    final StreamController<JokeState> controller =
+        StreamController<JokeState>.broadcast();
+
+    whenListen(
+      mockJokeBloc,
+      controller.stream,
+      initialState: JokeError(message: 'An error occurred'),
+    );
+
+    await tester.pumpWidget(
+      MultiBlocProvider(
+        providers: [
+          BlocProvider<JokeBloc>(
+            create: (context) => mockJokeBloc,
+          ),
+        ],
+        child: MaterialApp(
+          home: JokePage(),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    // Check if the initial text is displayed
+    expect(find.text('Press the button to get a joke'), findsNothing);
+    expect(find.byType(CircularProgressIndicator), findsNothing);
+    expect(find.text('An error occurred'), findsOneWidget);
+    expect(find.text('setup'), findsNothing);
+    expect(find.text('punchline'), findsNothing);
+
+    controller.close();
   });
 }

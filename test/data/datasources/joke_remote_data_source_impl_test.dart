@@ -1,4 +1,4 @@
-import 'dart:convert'; // Add import for json.encode and json.decode
+import 'dart:convert';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
 import 'package:joke_gen_1/features/jokes/data/datasources/joke_remote_datasource.dart';
@@ -8,6 +8,7 @@ import 'package:mockito/mockito.dart';
 
 import 'joke_remote_data_source_impl_test.mocks.dart';
 
+// Generate mock classes for http.Client and JokeRemoteDataSource
 @GenerateMocks([http.Client, JokeRemoteDataSource])
 void main() {
   late JokeRemoteDataSourceImpl dataSource;
